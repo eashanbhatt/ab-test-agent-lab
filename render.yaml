@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ab-test-agent-lab
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false        # you paste this manually in Render dashboard (keeps it secret)
+      - key: PYTHON_VERSION
+        value: 3.11.0

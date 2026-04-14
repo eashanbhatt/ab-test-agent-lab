@@ -1,0 +1,212 @@
+
+============================================================
+  AB TEST AGENT LAB — RENDER DEPLOYMENT GUIDE
+  Step-by-step for beginners. No experience needed.
+============================================================
+
+YOUR GOAL:
+  Put your app on the internet at a URL like:
+  https://ab-test-agent-lab.onrender.com
+
+FILES IN THIS PROJECT:
+  app.py           ← Python backend (FastAPI + Claude AI)
+  index.html       ← The app your client sees
+  requirements.txt ← Python packages to install
+  render.yaml      ← Tells Render how to run your app
+  .gitignore       ← Hides secrets from GitHub
+  DEPLOY.txt       ← This guide
+
+
+============================================================
+  PHASE 1 — SET UP GITHUB (one-time, ~5 minutes)
+============================================================
+
+GitHub is a free website that stores your code online.
+Render reads your code from GitHub to deploy it.
+
+STEP 1: Create a GitHub account
+  → Go to https://github.com
+  → Click "Sign up" and create a free account
+
+STEP 2: Create a new repository (a "repo" = a folder on GitHub)
+  → After logging in, click the "+" icon (top right)
+  → Click "New repository"
+  → Name it:  ab-test-agent-lab
+  → Keep it "Public" (required for free Render)
+  → Check "Add a README file"
+  → Click "Create repository"
+
+STEP 3: Install Git on your computer (if you don't have it)
+  → Check: open Terminal and type  git --version
+  → If you see a version number, you have it. Skip to Step 4.
+  → If not, download from: https://git-scm.com/downloads
+
+STEP 4: Clone the repo to your computer
+  → On your new GitHub repo page, click the green "Code" button
+  → Copy the HTTPS URL (looks like https://github.com/YOUR-NAME/ab-test-agent-lab.git)
+  → Open Terminal and run:
+
+      git clone https://github.com/YOUR-NAME/ab-test-agent-lab.git
+      cd ab-test-agent-lab
+
+STEP 5: Copy your project files into the cloned folder
+  → Copy these files into the  ab-test-agent-lab  folder:
+      app.py
+      index.html
+      requirements.txt
+      render.yaml
+      .gitignore
+
+STEP 6: Push (upload) the files to GitHub
+  → In Terminal (inside the ab-test-agent-lab folder), run:
+
+      git add .
+      git commit -m "first upload"
+      git push
+
+  → GitHub might ask for your username and password.
+  → After this, refresh your GitHub repo page — you should see all your files!
+
+
+============================================================
+  PHASE 2 — DEPLOY ON RENDER (~5 minutes)
+============================================================
+
+STEP 7: Create a Render account
+  → Go to https://render.com
+  → Click "Get Started for Free"
+  → Sign up with your GitHub account (easiest option)
+
+STEP 8: Create a new Web Service
+  → On the Render dashboard, click "New +"
+  → Click "Web Service"
+  → Click "Connect account" next to GitHub if prompted
+  → Find your  ab-test-agent-lab  repo and click "Connect"
+
+STEP 9: Configure the service
+  Render will auto-detect most settings from render.yaml, but check:
+
+  Name:            ab-test-agent-lab
+  Region:          pick the closest to you
+  Branch:          main
+  Runtime:         Python 3
+  Build Command:   pip install -r requirements.txt
+  Start Command:   uvicorn app:app --host 0.0.0.0 --port $PORT
+
+  ⚠️  Do NOT change $PORT — Render sets this automatically
+
+STEP 10: Add your secret API key
+  → Scroll down to "Environment Variables"
+  → Click "Add Environment Variable"
+  → Key:    ANTHROPIC_API_KEY
+  → Value:  sk-ant-YOUR-ACTUAL-KEY-HERE
+  → Click "Save"
+
+  ⚠️  IMPORTANT: Never put your API key in any code file.
+     This is the safe way — only Render can see it.
+
+STEP 11: Deploy!
+  → Click "Create Web Service"
+  → Render will now:
+      1. Download your code from GitHub
+      2. Install packages from requirements.txt
+      3. Start your app with uvicorn
+  → This takes 2–4 minutes. You can watch the build log.
+  → When you see "Your service is live" — you're done! 🎉
+
+STEP 12: Open your live app
+  → At the top of the page you'll see a URL like:
+      https://ab-test-agent-lab.onrender.com
+  → Click it — your app is now live on the internet!
+  → Share this URL with your client.
+
+
+============================================================
+  PHASE 3 — UPDATING YOUR APP LATER
+============================================================
+
+Whenever you change app.py or index.html:
+
+  1. Save the file
+  2. Run in Terminal (inside your project folder):
+
+       git add .
+       git commit -m "describe what you changed"
+       git push
+
+  3. Render automatically detects the push and re-deploys.
+     No manual steps needed — it's fully automatic!
+
+
+============================================================
+  IMPORTANT: FREE TIER BEHAVIOUR
+============================================================
+
+On Render's free tier:
+  → Your app "sleeps" after 15 minutes of no visitors.
+  → The first visit after sleeping takes ~30 seconds to wake up.
+  → After it wakes up, it runs normally.
+  → This is fine for demos and client presentations.
+  → To avoid sleeping: upgrade to Render's Starter plan ($7/mo)
+     or open the app yourself a minute before your demo.
+
+Tip for demos: Open your app URL ~2 minutes before showing the
+client so it has time to wake up and feel snappy.
+
+
+============================================================
+  TROUBLESHOOTING
+============================================================
+
+Problem: Build fails in Render
+  → Click "Logs" tab on Render to see the error
+  → Most common cause: typo in requirements.txt or app.py
+
+Problem: App opens but shows "Could not reach backend"
+  → Your API key is missing or wrong
+  → Go to Render dashboard → your service → Environment
+  → Check ANTHROPIC_API_KEY is set correctly
+
+Problem: "git push" asks for password
+  → GitHub no longer accepts passwords — use a Personal Access Token
+  → Go to github.com → Settings → Developer settings → Personal access tokens
+  → Generate a token and use it as your password
+
+Problem: App works locally but not on Render
+  → Check that all files are committed (git add . then git push)
+  → Check Render logs for Python errors
+
+
+============================================================
+  FULL FILE STRUCTURE (must all be in your GitHub repo)
+============================================================
+
+  ab-test-agent-lab/
+  ├── app.py            ← backend
+  ├── index.html        ← frontend
+  ├── requirements.txt  ← packages
+  ├── render.yaml       ← Render config
+  ├── .gitignore        ← keeps secrets safe
+  └── DEPLOY.txt        ← this guide
+
+
+============================================================
+  QUICK REFERENCE — COMMANDS YOU'LL USE AGAIN
+============================================================
+
+  # First time setup
+  git clone <your-repo-url>
+  cd ab-test-agent-lab
+
+  # Every time you update files
+  git add .
+  git commit -m "what I changed"
+  git push
+
+  # Run locally (for testing before pushing)
+  source venv/bin/activate
+  export ANTHROPIC_API_KEY="sk-ant-..."
+  python app.py
+  # open http://localhost:8000
+
+============================================================

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AB Test Agent Lab</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --green: #1D9E75;
+    --green-light: #E1F5EE;
+    --green-dark: #0F6E56;
+    --amber: #BA7517;
+    --red: #A32D2D;
+    --radius: 10px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+  .layout { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .tab { background: none; border: none; padding: 8px 16px; font-size: 13px; cursor: pointer;
+         color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--text); }
+
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+  /* Forms */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  input[type=text], select, textarea {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; background: var(--bg); color: var(--text); width: 100%;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  /* Buttons */
+  .btn { padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer;
+         border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn-primary:hover { opacity: .85; }
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+
+  /* Agent log */
+  .log { background: #111; border-radius: 6px; padding: 12px; font-size: 12px;
+         font-family: 'Courier New', monospace; color: #7fff7f; max-height: 180px;
+         overflow-y: auto; line-height: 1.9; white-space: pre-wrap; }
+
+  /* Variants */
+  .variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .variant-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .variant-card.winner { border-color: var(--green); border-width: 2px; }
+  .vt-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+              color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .vt-text { font-size: 13px; line-height: 1.55; }
+  .badge-green { display: inline-block; background: var(--green-light); color: var(--green-dark);
+                 font-size: 11px; padding: 2px 10px; border-radius: 99px; margin-top: 8px; }
+
+  /* Metrics */
+  .metrics-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 1rem; }
+  .metric { background: var(--bg); border-radius: 8px; padding: 12px; }
+  .m-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .m-val { font-size: 24px; font-weight: 600; }
+  .m-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Progress bar */
+  .bar-wrap { height: 6px; background: var(--bg); border-radius: 3px; margin: 6px 0; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+
+  /* Test list */
+  .test-row { display: flex; justify-content: space-between; align-items: center;
+              padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .test-row:last-child { border-bottom: none; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .dot-run  { background: var(--amber); }
+  .dot-win  { background: var(--green); }
+  .dot-stop { background: var(--red); }
+
+  /* Simulation */
+  .sim-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 1rem; }
+  .slider-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .slider-wrap input[type=range] { width: 110px; accent-color: var(--green); }
+  .slider-val { font-weight: 600; color: var(--text); min-width: 36px; }
+
+  /* Insight */
+  .insight-box { border-left: 3px solid var(--green); padding: 10px 14px; font-size: 13px;
+                 line-height: 1.65; border-radius: 0 6px 6px 0; background: var(--green-light);
+                 color: #14574a; margin-top: 12px; }
+  .rec-box { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; }
+  .rec-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+               color: var(--muted); margin-bottom: 6px; }
+
+  /* Spinner */
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border);
+          border-top-color: var(--text); border-radius: 50%; animation: spin .7s linear infinite;
+          vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .grid2, .variant-grid, .metrics-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <h1>🧪 AB Test Agent Lab</h1>
+  <p class="subtitle">Agentic UI/UX testing — generate variants, simulate traffic, auto-stop on significance</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="tab('create')">Create test</button>
+    <button class="tab" onclick="tab('live')">Live tests</button>
+    <button class="tab" onclick="tab('simulate')">Simulation</button>
+    <button class="tab" onclick="tab('results')">Results</button>
+  </div>
+
+  <!-- ── CREATE ─────────────────────────────────────── -->
+  <div id="s-create" class="section active">
+    <div class="card">
+      <div class="card-title">Test configuration</div>
+      <div class="grid2">
+        <div class="field"><label>Test name</label>
+          <input type="text" id="testName" value="Checkout CTA button" /></div>
+        <div class="field"><label>Component type</label>
+          <select id="compType">
+            <option>CTA button</option><option>Headline copy</option>
+            <option>Navigation layout</option><option>Onboarding flow</option><option>Form design</option>
+          </select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Primary metric</label>
+          <select id="metric">
+            <option>Click-through rate</option><option>Conversion rate</option>
+            <option>Time on page</option><option>Scroll depth</option>
+          </select></div>
+        <div class="field"><label>Traffic split</label>
+          <select id="split"><option>50 / 50</option><option>70 / 30</option><option>80 / 20</option></select></div>
+      </div>
+      <div class="field"><label>Describe control variant A</label>
+        <textarea id="controlDesc">Blue "Buy now" button, 48px height, centered below product image</textarea></div>
+      <div class="field"><label>Hypothesis for variant B</label>
+        <textarea id="hypothesis">Test if a larger green "Get it now" button with urgency text increases conversion</textarea></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="generateVariants()">Generate variants with AI ↗</button>
+        <button class="btn" onclick="tab('live')">View live tests</button>
+      </div>
+    </div>
+
+    <div class="card" id="genCard" style="display:none;">
+      <div class="card-title" id="genStatus"><span class="spin"></span>Agent thinking…</div>
+      <div class="log" id="agentLog"></div>
+      <div class="variant-grid" id="variantGrid" style="display:none;"></div>
+      <div id="launchWrap" style="display:none; margin-top:14px;">
+        <button class="btn btn-primary" onclick="launchTest()">Launch test ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LIVE ──────────────────────────────────────── -->
+  <div id="s-live" class="section">
+    <div class="card">
+      <div class="card-title">Running tests</div>
+      <div id="testList"><p style="color:var(--muted);font-size:13px;">Loading…</p></div>
+    </div>
+    <div class="card" id="liveDetail" style="display:none;">
+      <div class="card-title">Onboarding step 2 layout — live metrics</div>
+      <div class="metrics-row">
+        <div class="metric"><div class="m-label">Variant A (control)</div>
+          <div class="m-val">11.2%</div><div class="m-sub">conversion rate</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:45%;background:#888;"></div></div></div>
+        <div class="metric"><div class="m-label">Variant B (challenger)</div>
+          <div class="m-val" style="color:var(--green);">14.9%</div><div class="m-sub">conversion rate</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:60%;background:var(--green);"></div></div></div>
+        <div class="metric"><div class="m-label">Statistical confidence</div>
+          <div class="m-val">96.3%</div><div class="m-sub">p = 0.037 — significant</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:96%;background:#5DCAA5;"></div></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="tab('results')">Full analysis ↗</button>
+        <button class="btn" onclick="stopTopTest()">Stop test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SIMULATE ──────────────────────────────────── -->
+  <div id="s-simulate" class="section">
+    <div class="card">
+      <div class="card-title">Traffic simulation</div>
+      <div class="sim-controls">
+        <div class="slider-wrap">Daily visitors
+          <input type="range" id="vis" min="100" max="5000" step="100" value="1000" oninput="updateSliders()">
+          <span class="slider-val" id="visV">1,000</span>
+        </div>
+        <div class="slider-wrap">Base CTR
+          <input type="range" id="ctr" min="1" max="25" step="1" value="10" oninput="updateSliders()">
+          <span class="slider-val" id="ctrV">10%</span>
+        </div>
+        <div class="slider-wrap">Effect size
+          <input type="range" id="eff" min="1" max="50" step="1" value="20" oninput="updateSliders()">
+          <span class="slider-val" id="effV">+20%</span>
+        </div>
+        <button class="btn btn-primary" onclick="runSim()">Run simulation</button>
+      </div>
+      <div class="metrics-row" id="simStats">
+        <div class="metric"><div class="m-label">Days to significance</div>
+          <div class="m-val" id="sDays">—</div><div class="m-sub">at 95% confidence</div></div>
+        <div class="metric"><div class="m-label">Min sample / variant</div>
+          <div class="m-val" id="sSample">—</div><div class="m-sub">visitors needed</div></div>
+        <div class="metric"><div class="m-label">Expected lift</div>
+          <div class="m-val" id="sLift">—</div><div class="m-sub">relative improvement</div></div>
+      </div>
+      <div style="position:relative;width:100%;height:220px;">
+        <canvas id="simChart" role="img" aria-label="Simulated cumulative conversion curves for variant A and B"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULTS ───────────────────────────────────── -->
+  <div id="s-results" class="section">
+    <div class="card">
+      <div class="card-title">Onboarding step 2 layout — full analysis</div>
+      <div class="metrics-row">
+        <div class="metric"><div class="m-label">Uplift</div>
+          <div class="m-val" style="color:var(--green);">+33%</div><div class="m-sub">relative B vs A</div></div>
+        <div class="metric"><div class="m-label">Visitors tested</div>
+          <div class="m-val">12,440</div><div class="m-sub">6,220 per variant</div></div>
+        <div class="metric"><div class="m-label">Duration</div>
+          <div class="m-val">7 days</div><div class="m-sub">auto-stopped at sig.</div></div>
+      </div>
+      <div class="rec-box">
+        <div class="rec-title">Agent recommendation</div>
+        <p style="font-size:13px;line-height:1.6;">Variant B significantly outperforms the control at 96.3% confidence.
+        The redesigned step 2 layout reduces cognitive load and shows a clear 3.7pp absolute lift.
+        Recommend shipping Variant B to 100% of users.</p>
+      </div>
+      <div class="insight-box">
+        Secondary insight: Mobile users showed an even larger lift (+41%), suggesting the new layout benefits
+        most from reduced horizontal scrolling on smaller screens.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">AI agent deep analysis</div>
+      <button class="btn btn-primary" onclick="getInsight()" style="margin-bottom:12px;">Ask agent for deeper analysis ↗</button>
+      <div id="insightOut" style="font-size:13px;color:var(--muted);line-height:1.7;">
+        Click above to get segment analysis, UX reasoning, and next test recommendations.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';   // empty = same host (FastAPI serves this file)
+let simChart = null;
+let variantData = null;
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function tab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['create','live','simulate','results'][i] === name);
+  });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('s-' + name).classList.add('active');
+  if (name === 'live')     loadTests();
+  if (name === 'simulate') setTimeout(updateSliders, 100);
+}
+
+// ── Live tests ────────────────────────────────────────────────────────────
+async function loadTests() {
+  try {
+    const r = await fetch(API + '/api/tests');
+    const { tests } = await r.json();
+    const statusDot = { running: 'dot-run', winner: 'dot-win', stopped: 'dot-stop' };
+    const statusMsg = { running: 'Collecting data…', winner: 'Winner found ✓', stopped: 'Stopped — no effect' };
+    const statusColor = { running: 'var(--amber)', winner: 'var(--green)', stopped: 'var(--red)' };
+
+    document.getElementById('testList').innerHTML = tests.map(t => `
+      <div class="test-row">
+        <div>
+          <span class="dot ${statusDot[t.status] || 'dot-run'}"></span>
+          <strong>${t.name}</strong>
+          <span style="font-size:11px;background:var(--bg);padding:2px 8px;border-radius:99px;
+                       border:1px solid var(--border);color:var(--muted);margin-left:8px;">${t.metric}</span>
+        </div>
+        <div style="text-align:right;font-size:12px;color:var(--muted);">
+          <div>${t.visitors.toLocaleString()} visitors · Day ${t.day}</div>
+          <div style="margin-top:2px;color:${statusColor[t.status]}">${statusMsg[t.status]}</div>
+        </div>
+      </div>`).join('');
+
+    // Show detail for winner
+    const winner = tests.find(t => t.status === 'winner');
+    document.getElementById('liveDetail').style.display = winner ? 'block' : 'none';
+  } catch(e) {
+    document.getElementById('testList').innerHTML =
+      '<p style="color:var(--red);font-size:13px;">Could not reach backend. Is the server running?</p>';
+  }
+}
+
+async function stopTopTest() {
+  await fetch(API + '/api/tests/t1/stop', { method: 'POST' });
+  loadTests();
+}
+
+// ── Generate variants ─────────────────────────────────────────────────────
+async function generateVariants() {
+  const card = document.getElementById('genCard');
+  const log  = document.getElementById('agentLog');
+  card.style.display = 'block';
+  log.textContent = '';
+  document.getElementById('variantGrid').style.display = 'none';
+  document.getElementById('launchWrap').style.display = 'none';
+  document.getElementById('genStatus').innerHTML = '<span class="spin"></span>Agent thinking…';
+
+  const body = {
+    test_name:           document.getElementById('testName').value,
+    component_type:      document.getElementById('compType').value,
+    metric:              document.getElementById('metric').value,
+    traffic_split:       document.getElementById('split').value,
+    control_description: document.getElementById('controlDesc').value,
+    hypothesis:          document.getElementById('hypothesis').value,
+  };
+
+  try {
+    const resp = await fetch(API + '/api/generate-variants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') { parseAndShowVariants(fullText); return; }
+        try {
+          const { chunk } = JSON.parse(raw);
+          fullText += chunk;
+          log.textContent += chunk;
+          log.scrollTop = log.scrollHeight;
+        } catch {}
+      }
+    }
+  } catch(e) {
+    log.textContent += '\n\n[Error: Could not reach backend. Is the server running?]';
+  }
+}
+
+function parseAndShowVariants(text) {
+  document.getElementById('genStatus').textContent = 'Variants generated ✓';
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/);
+  let va = { label: 'Control', description: 'Blue "Buy now" button, 48px height', predicted_ctr_change: 'baseline' };
+  let vb = { label: 'Challenger', description: 'Green "Get it now" button with urgency text', predicted_ctr_change: '+15% to +25%' };
+  let rationale = 'Larger button with urgency copy reduces hesitation.';
+
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      va = parsed.variant_a || va;
+      vb = parsed.variant_b || vb;
+      rationale = parsed.agent_rationale || rationale;
+      variantData = parsed;
+    } catch {}
+  }
+
+  document.getElementById('variantGrid').innerHTML = `
+    <div class="variant-card">
+      <div class="vt-label">Variant A · ${va.label}</div>
+      <div class="vt-text">${va.description}</div>
+      <div style="margin-top:6px;font-size:11px;color:var(--muted);">${va.predicted_ctr_change}</div>
+    </div>
+    <div class="variant-card winner">
+      <div class="vt-label">Variant B · ${vb.label}</div>
+      <div class="vt-text">${vb.description}</div>
+      <div style="margin-top:6px;font-size:11px;color:var(--muted);">${vb.predicted_ctr_change}</div>
+      <div class="badge-green">Predicted higher CTR</div>
+    </div>`;
+
+  document.getElementById('variantGrid').style.display = 'grid';
+  document.getElementById('launchWrap').style.display = 'block';
+}
+
+function launchTest() {
+  alert('Test launched! Check the Live Tests tab.');
+  tab('live');
+}
+
+// ── Simulation ────────────────────────────────────────────────────────────
+function updateSliders() {
+  const vis = parseInt(document.getElementById('vis').value);
+  const ctr = parseInt(document.getElementById('ctr').value);
+  const eff = parseInt(document.getElementById('eff').value);
+  document.getElementById('visV').textContent = vis.toLocaleString();
+  document.getElementById('ctrV').textContent = ctr + '%';
+  document.getElementById('effV').textContent = '+' + eff + '%';
+  runSim();
+}
+
+async function runSim() {
+  const vis = parseInt(document.getElementById('vis').value);
+  const ctr = parseInt(document.getElementById('ctr').value) / 100;
+  const eff = parseInt(document.getElementById('eff').value) / 100;
+
+  try {
+    const r = await fetch(API + '/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ daily_visitors: vis, base_ctr: ctr, effect_size: eff }),
+    });
+    const d = await r.json();
+    document.getElementById('sDays').textContent   = d.days_to_significance;
+    document.getElementById('sSample').textContent = d.sample_per_variant.toLocaleString();
+    document.getElementById('sLift').textContent   = '+' + d.expected_lift_pct + '%';
+    drawSimChart(d.chart);
+  } catch(e) {
+    document.getElementById('sDays').textContent = 'N/A';
+  }
+}
+
+function drawSimChart(chart) {
+  if (simChart) { simChart.destroy(); simChart = null; }
+  const ctx = document.getElementById('simChart').getContext('2d');
+  simChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chart.labels,
+      datasets: [
+        { label: 'Variant A', data: chart.variant_a, borderColor: '#888',
+          backgroundColor: 'rgba(136,136,136,0.08)', borderWidth: 1.5, pointRadius: 2, tension: 0.35 },
+        { label: 'Variant B', data: chart.variant_b, borderColor: '#1D9E75',
+          backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 1.5, pointRadius: 2, tension: 0.35 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+}
+
+// ── Insights ──────────────────────────────────────────────────────────────
+async function getInsight() {
+  const box = document.getElementById('insightOut');
+  box.innerHTML = '<span class="spin"></span>Agent analysing…';
+  try {
+    const r = await fetch(API + '/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        test_name: 'Onboarding step 2 layout',
+        variant_a_rate: 11.2,
+        variant_b_rate: 14.9,
+        confidence: 96.3,
+        visitors: 12440,
+        duration_days: 7
+      }),
+    });
+    const { insight } = await r.json();
+    box.innerHTML = insight.replace(/\n/g, '<br>');
+  } catch(e) {
+    box.textContent = 'Could not reach backend. Is the server running?';
+  }
+}
+
+// Init
+updateSliders();
+</script>
+</body>
+</html>
